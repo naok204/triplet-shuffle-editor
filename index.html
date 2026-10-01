@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Triplet Shuffle Editor</title>
+<style>
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+body { background: #101114; }
+#app {
+  min-height: 100vh;
+  background-color: light-dark(#f4f5f7, #101114);
+  color: light-dark(#17181c, #f2f3f5);
+  padding: 34px 22px 48px;
+}
+.shell { width: min(980px, 100%); margin: 0 auto; }
+header { display:flex; justify-content:space-between; gap:20px; align-items:flex-end; margin-bottom:28px; }
+.eyebrow { font-size:12px; letter-spacing:.16em; text-transform:uppercase; opacity:.58; font-weight:700; }
+h1 { font-size:clamp(28px, 5vw, 46px); line-height:1; margin:7px 0 0; letter-spacing:-.04em; }
+.sub { margin:10px 0 0; max-width:680px; opacity:.66; line-height:1.6; font-size:14px; }
+.badge { border:1px solid light-dark(#d5d8df,#30333b); padding:8px 11px; border-radius:999px; font-size:12px; white-space:nowrap; opacity:.75; }
+.panel { background: light-dark(#fff,#17191e); border:1px solid light-dark(#dfe2e8,#2b2e36); border-radius:18px; padding:20px; box-shadow:0 12px 40px rgba(0,0,0,.10); }
+.drop { border:1.5px dashed light-dark(#aeb4c0,#4c515d); border-radius:14px; padding:28px 18px; text-align:center; cursor:pointer; transition:.18s; }
+.drop:hover,.drop.drag { border-color:currentColor; transform:translateY(-1px); }
+.drop strong { display:block; font-size:16px; margin-bottom:6px; }
+.drop span { font-size:12px; opacity:.58; }
+input[type=file] { display:none; }
+.controls { display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-top:16px; }
+.control { padding:14px; border-radius:13px; background:light-dark(#f5f6f8,#1d2026); border:1px solid light-dark(#e0e3e9,#2c3039); }
+label { display:flex; justify-content:space-between; gap:12px; font-size:12px; font-weight:700; margin-bottom:9px; }
+output { font-variant-numeric:tabular-nums; opacity:.7; }
+input[type=number], select { width:100%; border:1px solid light-dark(#cfd4dd,#393e49); background:light-dark(#fff,#13151a); color:inherit; border-radius:9px; padding:10px 11px; font:inherit; }
+input[type=range] { width:100%; accent-color:currentColor; }
+.range-row { display:flex; align-items:center; gap:12px; }
+.actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
+button { appearance:none; border:0; border-radius:10px; padding:11px 15px; background:light-dark(#17181c,#f2f3f5); color:light-dark(#fff,#17181c); font-weight:750; cursor:pointer; }
+button.secondary { background:transparent; color:inherit; border:1px solid light-dark(#cfd3db,#3a3e47); }
+button:disabled { opacity:.38; cursor:not-allowed; }
+.status { min-height:22px; margin-top:12px; font-size:12px; opacity:.68; }
+.seek { margin-top:14px; display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:10px; font-size:11px; opacity:.78; }
+.seek input[type=range] { margin:0; }
+.time { font-variant-numeric:tabular-nums; min-width:42px; text-align:center; }
+.visual { margin-top:18px; }
+.wave { width:100%; height:108px; display:block; border-radius:12px; background:light-dark(#f1f2f4,#121419); border:1px solid light-dark(#e1e3e8,#292c34); }
+.legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; font-size:11px; opacity:.62; }
+.dot { width:8px; height:8px; display:inline-block; border-radius:50%; background:currentColor; margin-right:5px; }
+.note { margin-top:18px; padding:14px 16px; border-left:3px solid currentColor; background:light-dark(#f7f7f8,#1b1e24); border-radius:0 10px 10px 0; font-size:12px; line-height:1.7; opacity:.8; }
+footer { margin-top:18px; font-size:11px; opacity:.45; }
+@media (max-width:700px){ header{align-items:flex-start; flex-direction:column}.controls{grid-template-columns:1fr}.panel{padding:14px} }
+</style>
+</head>
+<body>
+<div id="app">
+  <main class="shell">
+    <header>
+      <div>
+        <div class="eyebrow">Audio utility / rhythm edit</div>
+        <h1>Triplet Shuffle Editor</h1>
+        <p class="sub">8分音符で切り分けた楽曲を、1拍あたり「3連符の2つ分 + 1つ分」に再配置。ドラムやループのシャッフル化をブラウザだけで試せます。</p>
+      </div>
+      <div class="badge">offline / browser processing</div>
+    </header>
+    <section class="panel">
+      <label class="drop" id="drop">
+        <strong>音源ファイルをここにドロップ</strong>
+        <span>WAV / MP3 / M4A など、ブラウザが再生できる音声</span>
+        <input id="file" type="file" accept="audio/*">
+      </label>
+      <div class="controls">
+        <div class="control">
+          <label for="bpm">元のBPM <output id="bpmOut">140</output></label>
+          <input id="bpm" type="number" min="30" max="300" step="0.1" value="140">
+        </div>
+        <div class="control">
+          <label for="resolution">処理単位</label>
+          <select id="resolution">
+            <option value="8">8分音符</option>
+            <option value="16">16分音符</option>
+          </select>
+        </div>
+        <div class="control">
+          <label for="swing">シャッフル量 <output id="swingOut">30.0%</output></label>
+          <div class="range-row"><span style="font-size:11px;opacity:.5">0%</span><input id="swing" type="range" min="0" max="100" step="0.1" value="30"><span style="font-size:11px;opacity:.5">100%</span></div>
+        </div>
+        <div class="control">
+          <label for="barStartEnabled"><span>小節頭指定</span><output id="barStartMode">オフ</output></label>
+          <div class="range-row"><input id="barStartEnabled" type="checkbox"><span style="font-size:11px;opacity:.65">必要な場合のみ使用</span></div>
+          <div id="barStartControl" style="display:none;margin-top:10px"><label for="barStart">位置 <output id="barStartOut">0.000 秒</output></label><div class="range-row"><input id="barStart" type="range" min="0" max="0" step="0.001" value="0" disabled></div><div style="margin-top:7px;font-size:11px;opacity:.55">元音源のこの位置を1拍目・小節頭として処理します。</div></div>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="preview" disabled>▶ 変換して再生</button>
+        <button id="stop" class="secondary" disabled>■ 停止</button>
+        <button id="export" class="secondary" disabled>WAVを書き出す</button>
+        <button id="exportMp3" class="secondary" disabled>MP3を書き出す</button>
+      </div>
+      <div class="status" id="status">音源を読み込んでください。</div>
+      <div class="seek">
+        <span class="time" id="currentTime">0:00</span>
+        <input id="seek" type="range" min="0" max="0" step="0.001" value="0" disabled aria-label="再生位置">
+        <span class="time" id="duration">0:00</span>
+      </div>
+      <div class="visual">
+        <canvas class="wave" id="wave" width="1800" height="216"></canvas>
+        <div class="legend"><span><i class="dot"></i>元の8分音符境界</span><span>1拍 = 8分音符2個 → 3連符3個</span><span>初期値 2:1</span></div>
+      </div>
+      <div class="note"><b>初期設定の動作：</b> 140 BPMなら元の8分音符は約214.3ms。各1拍について、前半の8分音符を約285.7ms（3連符2つ分）へ伸ばし、後半を約142.9ms（3連符1つ分）へ縮めます。1拍全体の長さは変わりません。</div>
+    </section>
+    <footer>音声処理はこのページ内で行います。長い楽曲ではブラウザのメモリ使用量が大きくなる場合があります。</footer>
+  </main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.all.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const fileEl=$('file'), drop=$('drop'), bpmEl=$('bpm'), bpmOut=$('bpmOut'), resolutionEl=$('resolution'), swingEl=$('swing'), swingOut=$('swingOut'), barStartEnabled=$('barStartEnabled'), barStartMode=$('barStartMode'), barStartControl=$('barStartControl'), barStartEl=$('barStart'), barStartOut=$('barStartOut'), seekEl=$('seek'), currentTimeEl=$('currentTime'), durationEl=$('duration');
+const preview=$('preview'), stop=$('stop'), exportBtn=$('export'), exportMp3Btn=$('exportMp3'), status=$('status'), canvas=$('wave'), ctx=canvas.getContext('2d');
+let audioCtx=null, sourceBuffer=null, resultBuffer=null, activeSource=null, fileName='shuffle', playStartedAt=0, playOffset=0, seekTimer=null, seeking=false, playbackToken=0;
+function setStatus(s){status.textContent=s;}
+function fmtTime(t){t=Math.max(0,Number(t)||0);const m=Math.floor(t/60),s=Math.floor(t%60);return m+':'+String(s).padStart(2,'0');}
+function updateSeekUI(pos){const dur=resultBuffer?.duration||0;seekEl.max=dur;seekEl.value=Math.min(pos,dur);currentTimeEl.textContent=fmtTime(pos);durationEl.textContent=fmtTime(dur);}
+function updateBarStartUI(pos){const dur=sourceBuffer?.duration||0;barStartEl.max=dur;barStartEl.value=Math.min(Math.max(0,pos),dur);barStartOut.textContent=(Number(barStartEl.value)||0).toFixed(3)+' 秒';}
+function updateLabels(){ bpmOut.textContent=Number(bpmEl.value).toFixed(1); swingOut.textContent=Number(swingEl.value).toFixed(1)+'%'; drawGrid(); }
+bpmEl.addEventListener('input',updateLabels); swingEl.addEventListener('input',updateLabels);
+drop.addEventListener('click',()=>fileEl.click());
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('drag')});
+drop.addEventListener('dragleave',()=>drop.classList.remove('drag'));
+drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('drag'); if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);});
+fileEl.addEventListener('change',()=>{if(fileEl.files[0]) loadFile(fileEl.files[0]);});
+async function loadFile(file){
+  try{
+    setStatus('音源を解析中…');
+    audioCtx ||= new (window.AudioContext||window.webkitAudioContext)();
+    const data=await file.arrayBuffer();
+    sourceBuffer=await audioCtx.decodeAudioData(data);
+    fileName=file.name.replace(/.[^.]+$/,'') || 'shuffle';
+    preview.disabled=false; resultBuffer=null; exportBtn.disabled=true; exportMp3Btn.disabled=true; seekEl.disabled=true; seekEl.value=0; updateSeekUI(0);
+    barStartEl.disabled=!barStartEnabled.checked; updateBarStartUI(0);
+    setStatus(file.name+' / '+sourceBuffer.numberOfChannels+'ch / '+(sourceBuffer.duration/60).toFixed(2)+' min / '+sourceBuffer.sampleRate+' Hz');
+    drawWaveform(sourceBuffer);
+  }catch(e){console.error(e);setStatus('読み込みに失敗しました。ブラウザで再生できる音声形式か確認してください。');}
+}
+function drawWaveform(buf){
+  const w=canvas.width,h=canvas.height; ctx.clearRect(0,0,w,h);
+  ctx.globalAlpha=.22; ctx.beginPath(); ctx.moveTo(0,h/2); ctx.lineTo(w,h/2); ctx.stroke();
+  const data=buf.getChannelData(0), step=Math.max(1,Math.floor(data.length/w));
+  ctx.globalAlpha=.65; ctx.beginPath();
+  for(let x=0;x<w;x++){let a=0,b=0,start=x*step,end=Math.min(data.length,start+step);for(let i=start;i<end;i++){const v=data[i];if(v<a)a=v;if(v>b)b=v;}ctx.moveTo(x,h/2+a*h*.44);ctx.lineTo(x,h/2+b*h*.44);}ctx.stroke(); ctx.globalAlpha=1; drawGrid();
+}
+function drawGrid(){
+  if(!sourceBuffer)return;
+  const w=canvas.width,h=canvas.height; const bpm=Number(bpmEl.value)||140; const beat=60/bpm;
+  ctx.save(); ctx.lineWidth=1; ctx.globalAlpha=.28;
+  for(let t=0;t<sourceBuffer.duration;t+=beat/2){let x=t/sourceBuffer.duration*w;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();}
+  ctx.restore();
+}
+function makeWavBlob(buf){
+  const ch=buf.numberOfChannels, len=buf.length, rate=buf.sampleRate;
+  const bytes=44+len*ch*3, ab=new ArrayBuffer(bytes), v=new DataView(ab);
+  const ws=(o,s)=>{for(let i=0;i<s.length;i++)v.setUint8(o+i,s.charCodeAt(i));};
+  ws(0,'RIFF');v.setUint32(4,36+len*ch*3,true);ws(8,'WAVE');ws(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,ch,true);v.setUint32(24,rate,true);v.setUint32(28,rate*ch*3,true);v.setUint16(32,ch*3,true);v.setUint16(34,24,true);ws(36,'data');v.setUint32(40,len*ch*3,true);
+  let off=44; for(let i=0;i<len;i++){for(let c=0;c<ch;c++){let x=Math.max(-1,Math.min(1,buf.getChannelData(c)[i]));let q=Math.round(x*8388607);if(q<0)q+=16777216;v.setUint8(off,q&255);v.setUint8(off+1,(q>>8)&255);v.setUint8(off+2,(q>>16)&255);off+=3;}}
+  return new Blob([ab],{type:'audio/wav'});
+}
+function makeMp3Blob(buf){
+  const channels=Math.min(2,buf.numberOfChannels), sampleRate=buf.sampleRate, kbps=192;
+  const encoder=new lamejs.Mp3Encoder(channels,sampleRate,kbps), block=1152, parts=[];
+  const left=buf.getChannelData(0), right=channels===2?buf.getChannelData(1):left;
+  const left16=new Int16Array(block), right16=channels===2?new Int16Array(block):null;
+  for(let i=0;i<buf.length;i+=block){
+    const n=Math.min(block,buf.length-i);
+    for(let j=0;j<n;j++){left16[j]=Math.max(-32768,Math.min(32767,Math.round(left[i+j]*32767)));if(right16)right16[j]=Math.max(-32768,Math.min(32767,Math.round(right[i+j]*32767)));}
+    const mp3buf=channels===2?encoder.encodeBuffer(left16.subarray(0,n),right16.subarray(0,n)):encoder.encodeBuffer(left16.subarray(0,n));
+    if(mp3buf.length)parts.push(new Int8Array(mp3buf));
+  }
+  const end=encoder.flush(); if(end.length)parts.push(new Int8Array(end));
+  return new Blob(parts,{type:'audio/mpeg'});
+}
+function stretchOLA(src,start,n,outN){
+  const ch=src.numberOfChannels, out=Array.from({length:ch},()=>new Float32Array(outN));
+  const grain=Math.max(512,Math.min(8192,Math.floor(n*0.5)));
+  const hopIn=Math.max(128,Math.floor(grain*0.25));
+  const ratio=outN/n, hopOut=Math.max(1,Math.floor(hopIn*ratio));
+  const win=new Float32Array(grain);
+  for(let i=0;i<grain;i++){const x=(i+0.5)/grain;win[i]=Math.sin(Math.PI*x);}
+  const norm=new Float32Array(outN);
+  let inPos=0,outPos=0;
+  while(outPos<outN){
+    let center=Math.min(Math.floor(inPos),Math.max(0,n-grain));
+    if(inPos>hopIn && center+grain<n){
+      const expected=center, search=Math.min(Math.floor(grain*0.18),Math.floor((n-grain)/2));
+      const ref=src.getChannelData(0), refStart=start+Math.max(0,expected-Math.floor(hopIn*0.5));
+      let best=expected, bestScore=-Infinity;
+      const step=2, overlap=Math.max(64,Math.min(Math.floor(hopIn*1.5),grain-1));
+      for(let d=-search;d<=search;d+=step){
+        const cand=Math.max(0,Math.min(n-grain,expected+d));
+        let ab=0,aa=0,bb=0;
+        const base=Math.max(0,Math.min(grain-overlap,Math.floor(hopIn*0.5)));
+        for(let j=0;j<overlap;j+=4){const a=ref[refStart+base+j]||0,b=ref[start+cand+base+j]||0;ab+=a*b;aa+=a*a;bb+=b*b;}
+        const score=ab/Math.sqrt(Math.max(1e-12,aa*bb));
+        if(score>bestScore){bestScore=score;best=cand;}
+      }
+      center=best;
+    }
+    const inStart=start+center, maxG=Math.min(grain,n-center,outN-outPos);
+    for(let j=0;j<maxG;j++){const w=win[j];norm[outPos+j]+=w;for(let c=0;c<ch;c++)out[c][outPos+j]+=(src.getChannelData(c)[inStart+j]||0)*w;}
+    inPos+=hopIn;outPos+=hopOut;
+    if(inPos>=n)inPos=Math.max(0,n-grain);
+  }
+  for(let c=0;c<ch;c++)for(let i=0;i<outN;i++)out[c][i]/=Math.max(.0001,norm[i]);
+  return out;
+}
+async function process(){
+  if(!sourceBuffer)return;
+  stopPlayback();
+  const bpm=Number(bpmEl.value), beat=60/bpm, unit=resolutionEl.value==='16'?beat/4:beat/2, sr=sourceBuffer.sampleRate;
+  const barStart=barStartEnabled.checked?Math.round((Number(barStartEl.value)||0)*sr):0;
+  const firstRatio=1+Number(swingEl.value)/100;
+  const secondRatio=2-firstRatio;
+  const pairIn=Math.round(unit*2*sr), firstOut=Math.round(unit*firstRatio*sr), secondOut=Math.round(unit*secondRatio*sr);
+  const pairs=Math.floor(Math.max(0,sourceBuffer.length-barStart)/pairIn);
+  const outLen=pairs*(firstOut+secondOut);
+  const out=new AudioBuffer({length:outLen,numberOfChannels:sourceBuffer.numberOfChannels,sampleRate:sr});
+  setStatus('変換中…'); await new Promise(r=>setTimeout(r,20));
+  for(let p=0;p<pairs;p++){
+    const inStart=barStart+p*pairIn,outStart=p*(firstOut+secondOut);
+    const a=stretchOLA(sourceBuffer,inStart,Math.round(unit*sr),firstOut);
+    const b=stretchOLA(sourceBuffer,inStart+Math.round(unit*sr),Math.round(unit*sr),secondOut);
+    for(let c=0;c<out.numberOfChannels;c++){out.getChannelData(c).set(a[c],outStart);out.getChannelData(c).set(b[c],outStart+firstOut);}
+    if(p%20===0)await new Promise(r=>setTimeout(r,0));
+  }
+  resultBuffer=out;exportBtn.disabled=false;exportMp3Btn.disabled=false;seekEl.disabled=false;updateSeekUI(0);
+  setStatus('変換完了 / '+out.duration.toFixed(2)+' 秒 / 小節頭 '+(barStart/sr).toFixed(3)+' 秒 / '+pairs+'拍分をシャッフル');
+  await playBuffer(resultBuffer,0);
+}
+async function playBuffer(buf,offset=0){
+  stopPlayback(false);
+  const token=++playbackToken;
+  audioCtx ||= new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state==='suspended')await audioCtx.resume();
+  if(token!==playbackToken)return;
+  activeSource=audioCtx.createBufferSource();activeSource.buffer=buf;activeSource.connect(audioCtx.destination);
+  playStartedAt=audioCtx.currentTime;playOffset=Math.max(0,Math.min(offset,buf.duration));
+  activeSource.onended=()=>{if(activeSource){activeSource=null;stop.disabled=true;playOffset=buf.duration;updateSeekUI(playOffset);}};
+  activeSource.start(0,playOffset);stop.disabled=false;
+  clearInterval(seekTimer);seekTimer=setInterval(()=>{if(!activeSource||seeking)return;const pos=Math.min(buf.duration,playOffset+(audioCtx.currentTime-playStartedAt));updateSeekUI(pos);},50);
+  updateSeekUI(playOffset);
+}
+function stopPlayback(clearPosition=true){
+  playbackToken++;
+  const src=activeSource;activeSource=null;
+  if(src){try{src.stop()}catch(e){}src.disconnect();}
+  clearInterval(seekTimer);seekTimer=null;stop.disabled=true;
+  if(clearPosition){playOffset=Number(seekEl.value)||0;updateSeekUI(playOffset);}
+}
+preview.addEventListener('click',process);stop.addEventListener('click',stopPlayback);
+seekEl.addEventListener('pointerdown',()=>{seeking=true;stopPlayback(false);});
+seekEl.addEventListener('input',()=>{seeking=true;updateSeekUI(Number(seekEl.value)||0);});
+seekEl.addEventListener('change',async()=>{const pos=Number(seekEl.value)||0;seeking=false;if(resultBuffer){await playBuffer(resultBuffer,pos);}else{updateSeekUI(pos);}});
+exportBtn.addEventListener('click',()=>{if(!resultBuffer)return;const a=document.createElement('a');a.href=URL.createObjectURL(makeWavBlob(resultBuffer));a.download=fileName+'_triplet-shuffle.wav';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);});
+exportMp3Btn.addEventListener('click',()=>{if(!resultBuffer)return;setStatus('MP3を書き出し中…');setTimeout(()=>{try{const a=document.createElement('a');a.href=URL.createObjectURL(makeMp3Blob(resultBuffer));a.download=fileName+'_triplet-shuffle.mp3';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);setStatus('MP3を書き出しました。');}catch(e){console.error(e);setStatus('MP3書き出しに失敗しました。');}},20);});
+barStartEnabled.addEventListener('change',()=>{barStartMode.textContent=barStartEnabled.checked?'オン':'オフ';barStartControl.style.display=barStartEnabled.checked?'block':'none';barStartEl.disabled=!barStartEnabled.checked;});
+barStartEl.addEventListener('input',()=>updateBarStartUI(Number(barStartEl.value)||0));
+updateLabels();
+</script>
+</body>
+</html>
